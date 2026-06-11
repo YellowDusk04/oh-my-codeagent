@@ -1,12 +1,27 @@
 # 第一节：写出第一个能跑的 Code Agent
 
-本项目使用 [tRPC-Agent-Go](https://github.com/trpc-group/trpc-agent-go) 框架进行开发。
+本项目使用 [trpc-agent-go](https://github.com/trpc-group/trpc-agent-go) 框架进行开发。
+
+> 💡 **阅读本文时，如何回到当前代码状态？**
+> 
+> 随着项目迭代，代码会不断更新。如果你在阅读本文时，想看到我们当前这个"最小 Demo"的代码状态，可以运行下面这条命令：
+> 
+> ```bash
+> git checkout d8b1658
+> ```
+> 
+> 这条命令会把代码"回溯"到我们这次提交时的状态。等你看得差不多了，想回到最新的代码，再运行 `git checkout main` 就行了。
+
+---
 
 好，我们先不扯那么多，直接来写一个能运行的最小的 Demo。这样你马上就能看到效果，成就感满满。
 
 先来看看我们最终能达到的效果（终端运行效果）：
 
-![](https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/authcode/?code=YWFjN2RiYThiNjMzZWY1MTc5MTNjMmUyN2IzZWNmMzRfMGY1MDM1ZTZlZjEwZGVjZTM3YTIzNTFiZWZiNjQ3M2RfSUQ6NzY0OTQ1Mzc4MDk0NTA3OTI1NV8xNzgxMDI3MzA1OjE3ODEwMzA5MDVfVjM)
+```bash
+% go run .
+你好！有什么我可以帮忙的吗？
+```
 
 看到没？我们只需要几行代码，就能让模型跟我们对话了！
 
@@ -168,13 +183,9 @@ fmt.Println()
 
 **这段代码在干嘛？**
 
-1. **`for event := range events`** —— 这是一个循环，用来不断地从 `events` 通道里取数据。每当 Agent 产生一个新的"事件"，这个循环就会执行一次。
-2. **`if event != nil && len(event.Choices) > 0`** —— 先检查一下，这个事件是不是有效的、有没有内容。
-3. **`choice := event.Choices[0]`** —— 取出这个事件里的第一个"选择"（通常只有一个）。
-4. **`if choice.Delta.Content != ""`** —— 如果这个"选择"里有新的内容（`Delta.Content` 就是新生成的那部分文字），我们就把它打印出来。
+我们在这个循环里消费 `events` 这个"数据流"。每当 Agent 产生一个新的事件（比如生成了一小段文字），我们就把它取出来，然后打印到终端上。
 
-   - 这里用的是 `fmt.Print()`（没有 `ln`），意思是"不换行打印"。因为我们用的是流式输出，模型是一个字一个字生成 (chunk) 的，所以我们得一个字一个字地打印，这样看起来就像是模型在"边想边说"。
-5. **`fmt.Println()`** —— 等所有事件都处理完了，打印一个换行符，让光标移到下一行。
+注意这里用的是 `fmt.Print()`（没有 `ln`），意思是"不换行打印"。因为我们用的是流式输出，模型是一个字一个字生成的，所以我们得一个字一个字地打印，这样看起来就像是模型在"边想边说"。等所有事件都处理完了，我们再打印一个换行符（`fmt.Println()`），让光标移到下一行。
 
 ---
 
@@ -242,8 +253,3 @@ go run main.go
 是不是还挺简单的？当然，这个 Demo 还很粗糙，后面我们会慢慢给它加功能，让它变得更像一个"代码助手"。
 
 下一节，我们会教 Agent 怎么用工具（Tool），这样它就能帮我们做实际的事情了！
-
----
-
-*文档版本：v0.2*  
-*最后更新：2026-06-10*

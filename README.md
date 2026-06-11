@@ -29,8 +29,4 @@ go run main.go
 
 ## 项目文档
 
-详细文档请参考：[飞书知识库](https://qcnzeanjf6ol.feishu.cn/wiki/Djnowd8fOie12cksTPycypvFn2e)
-
-## 许可证
-
-待定
+详细文档请参考：<a href="https://qcnzeanjf6ol.feishu.cn/wiki/OINPwhifAiRCnQk96VGc9ogWnuh?fromScene=spaceOverview" target="_blank">飞书知识库</a>
