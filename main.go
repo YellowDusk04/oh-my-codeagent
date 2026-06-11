@@ -16,7 +16,7 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("加载 .env 文件失败:", err)
+		log.Println("加载 .env 文件失败:", err)
 	}
 
 	modelInstance := openai.New(os.Getenv("MODEL_ID"),

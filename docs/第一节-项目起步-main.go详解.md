@@ -49,6 +49,7 @@
 OPENAI_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 BASE_URL=https://maas-api.cn-huabei-1.xf-yun.com/v2
 MODEL_ID=xxxxxxxxxxxxxxxx
+ENABLE_THINKING=false
 ```
 
 > ⚠️ **注意**：我这里把所有的值都用 `xxxx` 替代了。实际情况下，这里应该填真实的值。**这个文件里的信息千万不能给别人看，不然别人就能用你的账号调用模型了。**
