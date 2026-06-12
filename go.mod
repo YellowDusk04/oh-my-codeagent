@@ -4,7 +4,10 @@ go 1.26.4
 
 require (
 	github.com/joho/godotenv v1.5.1
+	github.com/mattn/go-sqlite3 v1.14.32
+	go.opentelemetry.io/otel v1.29.0
 	trpc.group/trpc-go/trpc-agent-go v1.10.0
+	trpc.group/trpc-go/trpc-agent-go/session/sqlite v1.10.0
 )
 
 require (
@@ -22,7 +25,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	go.opentelemetry.io/otel v1.29.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.29.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.29.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.29.0 // indirect
