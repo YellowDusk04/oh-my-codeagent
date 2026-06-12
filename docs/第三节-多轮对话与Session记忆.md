@@ -36,36 +36,22 @@ oh-my-codeagent/
 
 ## 第一步：创建 session.go
 
-新增 `session.go`，负责创建 SQLite Session Service：
+新增 `session.go`，负责创建 SQLite Session Service。
+
+**核心代码**（只展示关键部分）：
 
 ```go
-package main
-
-import (
-	"database/sql"
-	"fmt"
-
-	_ "github.com/mattn/go-sqlite3"
-	"trpc.group/trpc-go/trpc-agent-go/session"
-	"trpc.group/trpc-go/trpc-agent-go/session/sqlite"
-)
-
 func createSessionService() (session.Service, error) {
 	dsn := "file:sessions.db?_busy_timeout=5000"
 
 	db, err := sql.Open("sqlite3", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("打开数据库失败: %w", err)
-	}
+	// ... 错误处理
 
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(1)  // SQLite 建议单连接
 	db.SetMaxIdleConns(1)
 
 	svc, err := sqlite.NewService(db)
-	if err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("创建 session service 失败: %w", err)
-	}
+	// ... 错误处理
 
 	return svc, nil
 }
@@ -83,98 +69,40 @@ func createSessionService() (session.Service, error) {
 
 ## 第二步：改造 agent.go
 
-把 Session Service 传给 Runner，让 Agent 能读取对话历史：
+把 Session Service 传给 Runner，让 Agent 能读取对话历史。
+
+**关键改动**：
 
 ```go
-const (
-	agentName = "code-agent"
-	appName   = "oh-my-codeagent"
+r := runner.NewRunner(appName, agent,
+	runner.WithSessionService(sessionService),  // 关键：把 Session Service 传进来
 )
-
-func createRunner(sessionService session.Service) (runner.Runner, error) {
-	modelInstance := openai.New(
-		os.Getenv("MODEL_ID"),
-		openai.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-		openai.WithBaseURL(os.Getenv("BASE_URL")),
-	)
-
-	enableThinking := os.Getenv("ENABLE_THINKING") == "true"
-
-	agent := llmagent.New(agentName,
-		llmagent.WithModel(modelInstance),
-		llmagent.WithGenerationConfig(model.GenerationConfig{
-			Stream:          true,
-			ThinkingEnabled: &enableThinking,
-		}),
-	)
-
-	r := runner.NewRunner(appName, agent,
-		runner.WithSessionService(sessionService),  // 关键：把 Session Service 传进来
-	)
-
-	return r, nil
-}
 ```
 
-**关键改动**：`runner.WithSessionService(sessionService)` —— 这句话告诉 Runner："你用这个 Session Service 来管理对话历史"。
+**为什么要这样改？**
+
+- `runner.WithSessionService(sessionService)` 告诉 Runner："你用这个 Session Service 来管理对话历史"
+- 这样每次调用 `r.Run()` 时，Runner 会自动从 Session 中读取历史消息，并把新消息保存回去
 
 ---
 
 ## 第三步：改造 main.go，加入多轮对话循环
 
-现在来实现交互式多轮对话：
+现在来实现交互式多轮对话。
 
-```go
-func main() {
-	// 加载环境变量
-	if err := godotenv.Load(); err != nil {
-		log.Fatal(err)
-	}
+**核心逻辑**：
 
-	// 启动 Langfuse 遥测
-	clean, err := langfuse.Start(context.Background())
-	if err != nil {
-		log.Printf("Failed to start Langfuse telemetry: %v", err)
-	} else {
-		defer func() {
-			if err := clean(context.Background()); err != nil {
-				log.Printf("Failed to clean up: %v", err)
-			}
-		}()
-	}
+1. **初始化**：创建 Session Service 和 Runner
+2. **启动循环**：用 `for` 循环持续读取用户输入
+3. **处理命令**：支持 `/exit` 退出、`/session` 切换会话
+4. **调用 Agent**：把用户输入传给 `r.Run()`，并打印流式响应
 
-	// 创建 session service 和 runner
-	sessionService, err := createSessionService()
-	if err != nil {
-		log.Fatal("创建 session service 失败:", err)
-	}
-
-	r, err := createRunner(sessionService)
-	if err != nil {
-		log.Fatal("创建 runner 失败:", err)
-	}
-
-	// 设置用户和会话 ID
-	userID := "user-001"
-	sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
-
-	// 启动多轮对话
-	startChat(r, userID, &sessionID)
-
-	// 退出时打印 session ID
-	fmt.Printf("\n📝 当前 session ID: %s\n", sessionID)
-	fmt.Println("💡 下次启动时可以使用此 ID 恢复会话")
-}
-```
-
-**`startChat()` 函数**：实现 `while true` 循环，持续读取用户输入并调用 Agent：
+**关键代码片段**：
 
 ```go
 func startChat(r runner.Runner, userID string, sessionID *string) {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Printf("🤖 多轮对话已启动！\n")
-	fmt.Printf("📝 当前 session ID: %s\n", *sessionID)
-	fmt.Println("💡 命令: /exit 退出, /session new 新建会话, /session <id> 切换会话")
+	fmt.Println("🤖 多轮对话已启动！")
 
 	for {
 		fmt.Print("\nYou: ")
@@ -199,39 +127,38 @@ func startChat(r runner.Runner, userID string, sessionID *string) {
 			continue
 		}
 
-		// 创建带 baggage 的 context
+		// 调用 Agent
 		ctx := NewBaggageContext(userID, *sessionID)
-
-		events, err := r.Run(ctx,
-			userID,
-			*sessionID,
-			model.NewUserMessage(userInput),
-		)
-		if err != nil {
-			log.Println("运行失败:", err)
-			continue
-		}
-
-		// 处理事件流
-		fmt.Print("Assistant: ")
-		for event := range events {
-			if event != nil && len(event.Choices) > 0 {
-				choice := event.Choices[0]
-				if choice.Delta.Content != "" {
-					fmt.Print(choice.Delta.Content)
-				}
-			}
-		}
-		fmt.Println()
+		events, err := r.Run(ctx, userID, *sessionID, model.NewUserMessage(userInput))
+		// ... 处理事件流
 	}
 }
 ```
+
+**这段代码在干嘛？**
+
+- **`for` 循环**：实现 `while true` 效果，持续读取用户输入
+- **`/exit` 命令**：退出循环，结束程序
+- **`/session` 命令**：调用 `handleSessionCommand()` 处理会话切换
+- **`r.Run()`**：把用户输入传给 Agent，返回事件流（stream）
+- **事件流处理**：逐块打印 Agent 的回复（`choice.Delta.Content`）
 
 ---
 
 ## 第四步：支持 Session 切换
 
-实现 `/session` 命令，让用户可以新建或切换会话：
+实现 `/session` 命令，让用户可以新建或切换会话。
+
+**支持的命令**：
+
+| 命令 | 作用 |
+|------|------|
+| `/session` | 显示当前 session ID |
+| `/session new` | 创建新会话（清空对话历史） |
+| `/session <id>` | 切换到指定会话（恢复对话历史） |
+| `/exit` | 退出程序（会打印当前 session ID） |
+
+**实现逻辑**：
 
 ```go
 func handleSessionCommand(input string, sessionID *string) {
@@ -247,7 +174,6 @@ func handleSessionCommand(input string, sessionID *string) {
 		// /session new - 创建新会话
 		*sessionID = fmt.Sprintf("session-%d", time.Now().Unix())
 		fmt.Printf("✨ 已创建新会话\n")
-		fmt.Printf("📝 新 session ID: %s\n", *sessionID)
 		return
 	}
 
@@ -262,14 +188,11 @@ func handleSessionCommand(input string, sessionID *string) {
 }
 ```
 
-**支持的命令**：
+**关键点**：
 
-| 命令 | 作用 |
-|------|------|
-| `/session` | 显示当前 session ID |
-| `/session new` | 创建新会话（清空对话历史） |
-| `/session <id>` | 切换到指定会话（恢复对话历史） |
-| `/exit` | 退出程序（会打印当前 session ID） |
+- 使用指针 `*sessionID` 来修改外部的 session ID
+- `/session new` 会生成新的 session ID（基于时间戳）
+- `/session <id>` 会切换到指定的 session ID，从而恢复之前的对话历史
 
 ---
 
@@ -286,17 +209,17 @@ go run .
 📝 当前 session ID: session-1749707823
 💡 命令: /exit 退出, /session new 新建会话, /session <id> 切换会话
 
-You: 你好
-Assistant: 你好！有什么我可以帮助你的吗？
+You: 我会 Golang
+Assistant: 太好了！Golang 是一门很棒的语言。有什么我可以帮你的吗？
 
-You: 你还记得我刚才说了什么吗？
-Assistant: 当然记得！你刚才说"你好"。
+You: 我会什么？
+Assistant: 你刚才告诉我你会 Golang。
 
 You: /session new
 ✨ 已创建新会话
 📝 新 session ID: session-1749707956
 
-You: 我刚才说了什么？
+You: 我会什么？
 Assistant: 你好！我是 code-agent，有什么可以帮助你的吗？
 
 You: /exit
@@ -305,6 +228,13 @@ You: /exit
 📝 当前 session ID: session-1749707956
 💡 下次启动时可以使用此 ID 恢复会话
 ```
+
+**这个例子说明了什么？**
+
+1. **第一轮**：告诉 Agent "我会 Golang"，Agent 确认了
+2. **第二轮**：问 Agent "我会什么？"，Agent 能记住刚才说的话（因为 Session 保存了对话历史）
+3. **切换会话**：用 `/session new` 创建新会话后，Agent 不记得之前的信息（因为新会话的 Session 是空的）
+4. **恢复会话**：下次启动时，用 `/session session-1749707823` 可以恢复到第一个会话，Agent 会记得你说过"我会 Golang"
 
 ---
 
@@ -321,6 +251,12 @@ oh-my-codeagent/
 └── sessions.db    ← 对话历史存在这里
 ```
 
+**Session 里面存了什么？**
+
+- **消息历史**：用户和 Agent 的所有对话（包括时间戳）
+- **Session 元数据**：session ID、user ID、创建时间等
+- **状态信息**：如果有工具调用，也会保存在 Session 里
+
 ---
 
 ## 小结
@@ -331,6 +267,12 @@ oh-my-codeagent/
 2. **`agent.go`** 改造，把 Session Service 传给 Runner
 3. **`main.go`** 改造，加入多轮对话循环和 `/session` 命令
 4. **`tracing.go`** 不变
+
+**核心要点**：
+
+- Session 让 Agent 能记住对话历史，实现多轮对话
+- SQLite 是一个轻量的本地存储方案，适合开发环境
+- `/session` 命令让用户可以灵活管理会话
 
 现在 Agent 能记住对话历史了，多轮对话变得连贯自然。
 
