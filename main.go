@@ -70,6 +70,10 @@ func startChat(r runner.Runner, userID string, sessionID *string) {
 			break
 		}
 
+		if err := scanner.Err(); err != nil {
+			log.Fatal(err)
+		}
+
 		userInput := scanner.Text()
 		if userInput == "" {
 			continue

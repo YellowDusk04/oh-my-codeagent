@@ -1,6 +1,6 @@
 # 第三节：多轮对话与 Session 记忆
 
-> 💡 **回溯代码状态：** `git checkout 044f44d` 回到本次提交，`git checkout main` 回到最新。
+> 💡 **回溯代码状态：** `git checkout 440ca2d` 回到本次提交，`git checkout main` 回到最新。
 
 ---
 
@@ -140,7 +140,28 @@ func startChat(r runner.Runner, userID string, sessionID *string) {
 - **`for` 循环**：实现 `while true` 效果，持续读取用户输入
 - **`/exit` 命令**：退出循环，结束程序
 - **`/session` 命令**：调用 `handleSessionCommand()` 处理会话切换
-- **`r.Run()`**：把用户输入传给 Agent，返回事件流（stream）
+- **`r.Run(ctx, userID, *sessionID, ...)`**：把用户输入传给 Agent，返回事件流（stream）
+
+  **⚠️ 关键点：`*sessionID` 参数**
+  
+  这是**多轮对话连续性的核心**！
+  
+  - **同一个 Session ID** = 同一个对话上下文 = Agent 能记住之前的对话
+  - **不同的 Session ID** = 不同的对话上下文 = Agent 不记得之前的对话
+  
+  **为什么？**
+  
+  Agent 内部会把 `sessionID` 作为 key，在 Session Service 中查找对应的历史消息。每次调用 `r.Run()` 时：
+  1. Agent 用 `sessionID` 从 SQLite 中加载历史消息
+  2. 把当前用户输入追加到历史消息
+  3. 把完整的历史消息传给 LLM
+  4. LLM 基于完整历史生成回复
+  5. 把 LLM 的回复保存到 SQLite
+  
+  所以，**只要你一直用同一个 `sessionID` 调用 `r.Run()`，Agent 就能记住所有历史对话**！
+  
+  反之，如果你换个 `sessionID`，Agent 就会加载一个空的（或不同的）历史，自然就不记得之前的对话了。
+
 - **事件流处理**：逐块打印 Agent 的回复（`choice.Delta.Content`）
 
 ---
@@ -275,5 +296,3 @@ oh-my-codeagent/
 - `/session` 命令让用户可以灵活管理会话
 
 现在 Agent 能记住对话历史了，多轮对话变得连贯自然。
-
-下一节，我们教 Agent 用工具（Tool）。
