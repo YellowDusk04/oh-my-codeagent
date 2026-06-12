@@ -1,6 +1,6 @@
 # 第三节：多轮对话与 Session 记忆
 
-> 💡 **回溯代码状态：** `git checkout <待填写>` 回到本次提交，`git checkout main` 回到最新。
+> 💡 **回溯代码状态：** `git checkout 044f44d` 回到本次提交，`git checkout main` 回到最新。
 
 ---
 
@@ -286,17 +286,17 @@ go run .
 📝 当前 session ID: session-1749707823
 💡 命令: /exit 退出, /session new 新建会话, /session <id> 切换会话
 
-You: 你好，我叫黄奕帆
-Assistant: 你好，黄奕帆！有什么我可以帮助你的吗？
+You: 你好
+Assistant: 你好！有什么我可以帮助你的吗？
 
-You: 你还记得我的名字吗？
-Assistant: 当然记得，你是黄奕帆！
+You: 你还记得我刚才说了什么吗？
+Assistant: 当然记得！你刚才说"你好"。
 
 You: /session new
 ✨ 已创建新会话
 📝 新 session ID: session-1749707956
 
-You: 我叫什么名字？
+You: 我刚才说了什么？
 Assistant: 你好！我是 code-agent，有什么可以帮助你的吗？
 
 You: /exit
